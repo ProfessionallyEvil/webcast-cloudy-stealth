@@ -1,0 +1,47 @@
+---
+- hosts: all
+  become: true
+  vars:
+    current_client: '/client_data/current_client/ansible_sync_folder'
+  tasks:
+    - name: backup client directory locally
+      ansible.posix.synchronize:
+        src: /root/clients/
+        dest: '{{ current_client }}/'
+        archive: true
+        mode: pull
+    
+    - name: Backup burp stuff
+      ansible.posix.synchronize:
+        src: '/home/ubuntu/{{ item }}'
+        dest: '{{ current_client }}/burp/'
+        archive: true
+        mode: pull
+      loop:
+        - BurpSuitePro
+        - .BurpSuite
+      when: "'tag_Name_BurpScanning' in group_names"
+
+    - name: check for root zsh history
+      ansible.builtin.stat:
+        path: /root/.zsh_history
+      register: root_zsh_history
+
+    - name: backup zsh history
+      ansible.builtin.fetch:
+        src: /root/.zsh_history
+        dest: '{{ current_client }}/zsh_history/{{ inventory_hostname }}-{{ ansible_date_time.iso8601 }}'
+        flat: true
+      when: root_zsh_history.stat.exists
+
+    - name: check for root bash history
+      ansible.builtin.stat:
+        path: /root/.bash_history
+      register: root_bash_history
+
+    - name: backup bash history
+      ansible.builtin.fetch:
+        src: /root/.bash_history
+        dest: '{{ current_client }}/bash_history/{{ inventory_hostname }}-{{ ansible_date_time.iso8601 }}'
+        flat: true
+      when: root_bash_history.stat.exists

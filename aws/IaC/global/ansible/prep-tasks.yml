@@ -1,0 +1,87 @@
+- name: adding all user vars
+  include_vars: ssk-keys.yml
+
+- name: "adding SSH keys"
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    key: "{{ item.key }}"
+  loop: "{{ users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: create clients dir
+  file:
+    path: /root/clients
+    owner: root
+    group: root
+    mode: "770"
+    state: directory
+  become: true
+
+- name: update server
+  ansible.builtin.include_tasks: ./update-tasks.yml
+
+- name: reboot server
+  ansible.builtin.reboot:
+  become: true
+  when: updated.changed
+
+# for kali, but doesn't hurt for ubuntu
+- name: Create .hushlogin file for root
+  ansible.builtin.copy:
+    dest: "{{ item.path }}"
+    mode: "0644"
+    content: ""
+  become: "{{ item.root }}"
+  loop:
+    - path: /root/.hushlogin
+      root: true
+    - path: "{{ ansible_user_dir }}/.hushlogin"
+      root: false
+
+- name: Auto-promote to root on login
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    line: "sudo -i"
+    state: present
+    create: true
+  loop:
+    - "{{ ansible_user_dir }}/.zshrc"
+    - "{{ ansible_user_dir }}/.bashrc"
+
+- name: Installing base things
+  ansible.builtin.package:
+    state: present
+    name:
+      - tmux
+      - screen
+      - htop
+      - rsync
+      #  mainly for kali
+      - locales-all
+  become: true
+
+- name: sync data to remote host
+  ansible.posix.synchronize:
+    src: /client_data/current_client/ansible_sync_folder/
+    dest: /root/clients/
+    owner: false
+    group: false
+    perms: false
+    archive: true
+    rsync_opts:
+      - "--exclude=burp"
+  become: true
+  when:
+    - NO_SYNC is not defined
+
+- name: Modify root .zshrc
+  ansible.builtin.lineinfile:
+    path: /root/.zshrc
+    line: "{{ item.line }}"
+    regexp: "{{ item.regexp }}"
+    create: true
+  become: true
+  loop:
+    - line: "setopt EXTENDED_HISTORY"
+      regexp: "^setopt EXTENDED_HISTORY"

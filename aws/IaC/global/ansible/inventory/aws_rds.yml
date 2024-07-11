@@ -1,0 +1,9 @@
+plugin: amazon.aws.aws_rds
+regions:
+  - us-east-1
+keyed_groups:
+  - prefix: tag
+    key: tags
+compose:
+  ansible_host: endpoint.address
+  ansible_user: master_username
