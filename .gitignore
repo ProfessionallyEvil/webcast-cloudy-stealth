@@ -1,3 +1,5 @@
+id_rsa*
+.envrc
 # Created by https://www.toptal.com/developers/gitignore/api/terraform,ansible
 # Edit at https://www.toptal.com/developers/gitignore?templates=terraform,ansible
 
