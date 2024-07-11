@@ -1,0 +1,22 @@
+---
+- hosts: tag_Name_ManualScanning
+  tasks:
+    - name: prep tasks
+      ansible.builtin.include_tasks: ../global/ansible/prep-tasks.yml
+
+    # - name: installing docker
+    #   ansible.builtin.include_role:
+    #     name: elreydetoda.virtualization.docker
+
+    - name: installing scanning tools
+      ansible.builtin.package:
+        state: present
+        name:
+          # scanning
+          - nmap
+          - masscan
+          # web scrapping
+          - eyewitness
+          - witnessme
+      become: true
+    

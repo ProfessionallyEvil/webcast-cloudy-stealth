@@ -1,0 +1,3 @@
+---
+  - name: Provisioning Nessus
+    ansible.builtin.import_playbook: ../global/ansible/shared_playbooks/nessus-playbook.yml

@@ -1,0 +1,18 @@
+---
+- hosts: tag_Name_Bruteforce
+  tasks:
+    - name: prep tasks
+      ansible.builtin.include_tasks: ../global/ansible/prep-tasks.yml
+
+    - name: installing bruteforcing tools
+      ansible.builtin.package:
+        name:
+          # directory brute forcing
+          - gobuster
+          - dirb
+          - dirbuster
+          # wordlists
+          - seclists
+          # login brute forcing
+          - patator
+      become: true

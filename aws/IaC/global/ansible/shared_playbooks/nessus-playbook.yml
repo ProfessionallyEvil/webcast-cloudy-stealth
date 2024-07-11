@@ -1,0 +1,100 @@
+---
+- hosts: tag_NessusScanning_false
+
+  vars_prompt:
+    - name: "nessus_lic_prompt"
+      prompt: "What is the nessus license? (empty if you don't want to set one)"
+      private: false
+      default: "{{ lookup('env', 'NESSUS_LICENSE') }}"
+    - name: nessus_password
+      prompt: "What is the nessus password?"
+      private: true
+      confirm: true
+      default: "{{ lookup('env', 'NESSUS_PASSWORD') }}"
+
+  vars:
+    nessus_lic_prompt: "{{ lookup('env', 'NESSUS_LICENSE') }}"
+    nessus_password: "{{ lookup('env', 'NESSUS_PASSWORD') }}"
+    nessus_username: "si"
+
+  handlers:
+    - name: Reload nessusd
+      ansible.builtin.service:
+        name: nessusd
+        state: reloaded
+
+  tasks:
+    - name: prep tasks
+      ansible.builtin.include_tasks: ../prep-tasks.yml
+    
+    - name: Installing docker
+      community.general.snap:
+        name:
+          - docker
+      become: true
+
+    - name: Install python3 pip
+      ansible.builtin.package:
+        name: python3-pip
+        state: present
+      become: true
+
+    - name: Install docker python module
+      ansible.builtin.pip:
+        name: docker
+        version: 7.0.0
+        state: present
+        executable: pip3
+      become: true
+    
+    - name: Deploying nessus container
+      community.docker.docker_container:
+        name: nessus
+        image: docker.io/tenable/nessus:10.6.4-ubuntu
+        state: started
+        pull: true
+        restart_policy: unless-stopped
+        privileged: true
+        capabilities:
+          - net_admin
+        network_mode: host
+        shm_size: 4G
+        env:
+          USERNAME: "{{ nessus_username }}"
+          PASSWORD: "{{ nessus_password }}"
+          ACTIVATION_CODE: "{{ nessus_lic_prompt }}"
+      become: true
+      register: nessus_container
+      when: nessus_lic_prompt | length > 0
+
+    - name: Wait for Nessus to start
+      wait_for:
+        port: 8834
+        delay: 150
+        timeout: 600
+      when: nessus_container.changed
+
+    - name: Modifying nessus to use better defaults
+      community.docker.docker_container_exec:
+        container: nessus
+        argv:
+          - /opt/nessus/sbin/nessuscli
+          - fix
+          - --set
+          - '{{ item }}'
+      loop:
+        # configuring SIAMs to use sane defaults
+        - "scan_vulnerability_groups=no"
+        - "scan_vulnerability_groups_mixed=no"
+        - qdb_mem_usage=high
+      become: true
+      when:
+        - nessus_lic_prompt | length > 0
+        - nessus_container.changed
+
+    - name: Inform user of Nessus URL
+      ansible.builtin.debug:
+        msg: |
+          Nessus is ready at https://{{ hostvars[inventory_hostname]["public_ip_address"] }}:8834
+          with the username of: {{ nessus_username }}
+          and the password you entered
